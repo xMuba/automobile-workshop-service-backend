@@ -2,12 +2,12 @@
   "name": "automobile-workshop-backend",
   "version": "1.0.0",
   "description": "Backend API for Automobile Workshop application",
-  "main": "app.js",
+  "main": "src/app.js",
   "type": "module",
   "scripts": {
     "build": "npx prisma generate",
     "postinstall": "npx prisma generate",
-    "start": "node app.js",
+    "start": "node src/app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
