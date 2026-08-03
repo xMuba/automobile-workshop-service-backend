@@ -346,7 +346,7 @@
   <div class="main">
     <div class="topbar">
       <h2 id="page-title">Dashboard</h2>
-      <span class="demo-badge">⚡ Academic Presentation Mode</span>
+      <span class="demo-badge">⚡ Live Production Mode</span>
     </div>
 
     <div class="content">
@@ -549,7 +549,8 @@
   </div>
 
   <script>
-    const API = 'http://localhost:5000/api';
+    // ✅ Updated API URL pointing to your Render deployment
+    const API = 'https://automobile-workshop-service-backend.onrender.com/api';
 
     // Cache
     let cache = {
@@ -611,16 +612,24 @@
           get('/customers'), get('/vehicles'), get('/orders'),
           get('/appointments'), get('/parts?low_stock=true'), get('/invoices')
         ]);
-        document.getElementById('stat-customers').textContent = cust.data.customers.length;
-        document.getElementById('stat-vehicles').textContent = veh.data.vehicles.length;
-        document.getElementById('stat-orders').textContent = ord.data.orders.filter(o => o.status !== 'Completed').length;
-        document.getElementById('stat-appointments').textContent = app.data.appointments.filter(a => {
+        document.getElementById('stat-customers').textContent = cust.data?.customers?.length || cust.data?.length || 0;
+        document.getElementById('stat-vehicles').textContent = veh.data?.vehicles?.length || veh.data?.length || 0;
+        
+        const ordersList = ord.data?.orders || ord.data || [];
+        document.getElementById('stat-orders').textContent = ordersList.filter(o => o.status !== 'Completed').length;
+        
+        const appointmentsList = app.data?.appointments || app.data || [];
+        document.getElementById('stat-appointments').textContent = appointmentsList.filter(a => {
           const d = new Date(a.appointment_date);
           const t = new Date();
           return d.toDateString() === t.toDateString();
         }).length;
-        document.getElementById('stat-lowstock').textContent = parts.data.parts.length;
-        const revenue = inv.data.invoices.reduce((s, i) => s + parseFloat(i.grand_total), 0);
+        
+        const partsList = parts.data?.parts || parts.data || [];
+        document.getElementById('stat-lowstock').textContent = partsList.length;
+        
+        const invoicesList = inv.data?.invoices || inv.data || [];
+        const revenue = invoicesList.reduce((s, i) => s + parseFloat(i.grand_total || 0), 0);
         document.getElementById('stat-revenue').textContent = 'TK ' + revenue.toFixed(2);
       } catch (e) { console.error(e); }
     }
@@ -628,7 +637,7 @@
     // Customers
     async function loadCustomers() {
       const res = await get('/customers');
-      cache.customers = res.data.customers;
+      cache.customers = res.data?.customers || res.data || [];
       const tbody = document.getElementById('customers-table');
       tbody.innerHTML = cache.customers.map(c => `
         <tr>
@@ -636,7 +645,7 @@
           <td>${c.phone}</td>
           <td>${c.email || '-'}</td>
           <td><span class="badge badge-blue">${c._count?.vehicles || 0}</span></td>
-          <td>${new Date(c.created_at).toLocaleDateString()}</td>
+          <td>${new Date(c.created_at || Date.now()).toLocaleDateString()}</td>
         </tr>
       `).join('') || '<tr><td colspan="5" class="empty-state">No customers found</td></tr>';
     }
@@ -668,7 +677,7 @@
     // Vehicles
     async function loadVehicles() {
       const res = await get('/vehicles');
-      cache.vehicles = res.data.vehicles;
+      cache.vehicles = res.data?.vehicles || res.data || [];
       const tbody = document.getElementById('vehicles-table');
       tbody.innerHTML = cache.vehicles.map(v => `
         <tr>
@@ -722,7 +731,7 @@
     // Appointments
     async function loadAppointments() {
       const res = await get('/appointments');
-      cache.appointments = res.data.appointments;
+      cache.appointments = res.data?.appointments || res.data || [];
       const tbody = document.getElementById('appointments-table');
       tbody.innerHTML = cache.appointments.map(a => `
         <tr>
@@ -772,7 +781,7 @@
     // Service Orders
     async function loadOrders() {
       const res = await get('/orders');
-      cache.orders = res.data.orders;
+      cache.orders = res.data?.orders || res.data || [];
       const tbody = document.getElementById('orders-table');
       tbody.innerHTML = cache.orders.map(o => `
         <tr>
@@ -834,7 +843,7 @@
     async function openAddServiceModal(orderId) {
       try {
         const res = await get('/service-types');
-        cache.serviceTypes = res.data.serviceTypes || res.data;
+        cache.serviceTypes = res.data?.serviceTypes || res.data || [];
         
         const stOpts = cache.serviceTypes.map(st => 
           `<option value="${st.service_type_id}">${st.name} (TK ${st.price})</option>`
@@ -901,15 +910,15 @@
     // Invoices
     async function loadInvoices() {
       const res = await get('/invoices');
-      cache.invoices = res.data.invoices;
+      cache.invoices = res.data?.invoices || res.data || [];
       const tbody = document.getElementById('invoices-table');
       tbody.innerHTML = cache.invoices.map(i => `
         <tr>
           <td><code>${i.invoice_id.slice(0,8)}</code></td>
           <td><code>${i.serviceOrder?.order_id?.slice(0,8) || '-'}</code></td>
-          <td>TK ${parseFloat(i.service_total).toFixed(2)}</td>
-          <td>TK ${parseFloat(i.parts_total).toFixed(2)}</td>
-          <td><strong>TK ${parseFloat(i.grand_total).toFixed(2)}</strong></td>
+          <td>TK ${parseFloat(i.service_total || 0).toFixed(2)}</td>
+          <td>TK ${parseFloat(i.parts_total || 0).toFixed(2)}</td>
+          <td><strong>TK ${parseFloat(i.grand_total || 0).toFixed(2)}</strong></td>
           <td>
             <button class="btn btn-sm btn-secondary" onclick="printInvoice('${i.invoice_id}')">🖨️ Print</button>
           </td>
@@ -927,10 +936,10 @@
           <p><strong>Invoice ID:</strong> ${inv.invoice_id}</p>
           <p><strong>Date:</strong> ${new Date(inv.created_at || Date.now()).toLocaleDateString()}</p>
           <hr style="margin: 10px 0;">
-          <p><strong>Services Subtotal:</strong> TK ${parseFloat(inv.service_total).toFixed(2)}</p>
-          <p><strong>Parts Subtotal:</strong> TK ${parseFloat(inv.parts_total).toFixed(2)}</p>
+          <p><strong>Services Subtotal:</strong> TK ${parseFloat(inv.service_total || 0).toFixed(2)}</p>
+          <p><strong>Parts Subtotal:</strong> TK ${parseFloat(inv.parts_total || 0).toFixed(2)}</p>
           <p><strong>Tax Rate:</strong> ${inv.tax_rate || 10}%</p>
-          <h3><strong>Grand Total: TK ${parseFloat(inv.grand_total).toFixed(2)}</strong></h3>
+          <h3><strong>Grand Total: TK ${parseFloat(inv.grand_total || 0).toFixed(2)}</strong></h3>
         </div>
       `;
       window.print();
@@ -964,7 +973,7 @@
     // Parts
     async function loadParts() {
       const res = await get('/parts');
-      cache.parts = res.data.parts;
+      cache.parts = res.data?.parts || res.data || [];
       const tbody = document.getElementById('parts-table');
       tbody.innerHTML = cache.parts.map(p => `
         <tr>
@@ -1119,7 +1128,7 @@
     // Employees
     async function loadEmployees() {
       const res = await get('/employees');
-      cache.employees = res.data.employees;
+      cache.employees = res.data?.employees || res.data || [];
       const tbody = document.getElementById('employees-table');
       tbody.innerHTML = cache.employees.map(e => `
         <tr>
