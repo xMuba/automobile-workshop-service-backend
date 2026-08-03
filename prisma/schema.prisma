@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───
+
+enum UserRole {
+  ADMIN
+  CUSTOMER
+  EMPLOYEE
+}
+
+enum EmployeeRole {
+  MANAGER
+  MECHANIC
+  TECHNICIAN
+  RECEPTIONIST
+}
+
+// ─── AUTH LAYER ───
+
+model User {
+  user_id     String   @id @default(uuid()) @db.Uuid
+  phone       String   @unique                   // primary login identifier
+  email       String?  @unique                   // optional
+  password    String?                            // nullable — OTP login doesn't need a password
+  otp         String?                            // stores the current OTP code
+  otp_expires DateTime?                          // OTP expiry timestamp
+  role        UserRole
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  customer_id String?  @unique @db.Uuid
+  employee_id String?  @unique @db.Uuid
+
+  customer Customer? @relation(fields: [customer_id], references: [customer_id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employee_id], references: [employee_id], onDelete: Cascade)
+
+  @@map("user")
+}
+
+model Customer {
+  customer_id       String   @id @default(uuid()) @db.Uuid
+  name              String
+  phone             String @unique
+  email             String?
+  address           String?
+  registration_date DateTime @default(now()) @db.Date
+  created_at        DateTime @default(now())
+
+  vehicles     Vehicle[]
+  appointments Appointment[]
+  user         User?
+
+  @@map("customer")
+}
+
+model VehicleType {
+  vehicle_type_id String  @id @default(uuid()) @db.Uuid
+  type_name       String
+  description     String?
+
+  vehicles Vehicle[]
+
+  @@map("vehicle_type")
+}
+
+model Vehicle {
+  vehicle_id      String  @id @default(uuid()) @db.Uuid
+  customer_id     String  @db.Uuid
+  vehicle_type_id String? @db.Uuid
+  registration_no String  @unique
+  make            String?
+  model           String?
+  year            Int?
+  fuel_type       String?
+  color           String?
+  mileage         Int?
+  created_at      DateTime @default(now())
+
+  customer      Customer       @relation(fields: [customer_id], references: [customer_id], onDelete: Cascade)
+  vehicleType   VehicleType?   @relation(fields: [vehicle_type_id], references: [vehicle_type_id])
+  appointments  Appointment[]
+  serviceOrders ServiceOrder[]
+
+  @@map("vehicle")
+}
+
+model Employee {
+  employee_id String       @id @default(uuid()) @db.Uuid
+  name        String
+  phone       String
+  role        EmployeeRole
+  salary      Decimal?     @db.Decimal(10, 2)
+  hire_date   DateTime?    @db.Date
+
+  inspectionReports InspectionReport[]
+  serviceOrders     ServiceOrder[]
+  user              User?
+
+  @@map("employee")
+}
+
+model Appointment {
+  appointment_id   String   @id @default(uuid()) @db.Uuid
+  customer_id      String   @db.Uuid
+  vehicle_id       String   @db.Uuid
+  appointment_date DateTime
+  status           String   @default("Pending")
+  notes            String?
+
+  customer         Customer          @relation(fields: [customer_id], references: [customer_id], onDelete: Cascade)
+  vehicle          Vehicle           @relation(fields: [vehicle_id], references: [vehicle_id], onDelete: Cascade)
+  inspectionReport InspectionReport?
+
+  @@map("appointment")
+}
+
+model InspectionReport {
+  inspection_id    String   @id @default(uuid()) @db.Uuid
+  appointment_id   String   @unique @db.Uuid
+  employee_id      String   @db.Uuid
+  findings         String?
+  condition_rating String?
+  inspection_date  DateTime @default(now()) @db.Date
+
+  appointment  Appointment   @relation(fields: [appointment_id], references: [appointment_id], onDelete: Cascade)
+  employee     Employee      @relation(fields: [employee_id], references: [employee_id], onDelete: Cascade)
+  serviceOrder ServiceOrder?
+
+  @@map("inspection_report")
+}
+
+model ServiceOrder {
+  order_id       String    @id @default(uuid()) @db.Uuid
+  vehicle_id     String    @db.Uuid
+  employee_id    String?   @db.Uuid
+  inspection_id  String?   @unique @db.Uuid
+  start_date     DateTime? @db.Date
+  end_date       DateTime? @db.Date
+  status         String    @default("Waiting")
+  paymentStatus  String?   @default("PENDING")
+
+  vehicle       Vehicle           @relation(fields: [vehicle_id], references: [vehicle_id], onDelete: Cascade)
+  employee      Employee?         @relation(fields: [employee_id], references: [employee_id], onDelete: SetNull)
+  inspection    InspectionReport? @relation(fields: [inspection_id], references: [inspection_id])
+  orderServices OrderService[]
+  partsUsed     PartsUsed[]
+  invoice       Invoice?
+
+  @@map("service_order")
+}
+
+model ServiceType {
+  service_type_id String   @id @default(uuid()) @db.Uuid
+  service_name    String
+  description     String?
+  base_price      Decimal? @db.Decimal(10, 2)
+
+  orderServices OrderService[]
+
+  @@map("service_type")
+}
+
+model OrderService {
+  order_service_id String  @id @default(uuid()) @db.Uuid
+  order_id         String  @db.Uuid
+  service_type_id  String  @db.Uuid
+  price            Decimal @db.Decimal(10, 2)
+
+  serviceOrder ServiceOrder @relation(fields: [order_id], references: [order_id], onDelete: Cascade)
+  serviceType  ServiceType  @relation(fields: [service_type_id], references: [service_type_id])
+
+  @@map("order_service")
+}
+
+model Supplier {
+  supplier_id    String  @id @default(uuid()) @db.Uuid
+  name           String
+  contact_person String?
+  phone          String
+  address        String?
+
+  parts PartsInventory[]
+
+  @@map("supplier")
+}
+
+model PartsInventory {
+  part_id       String  @id @default(uuid()) @db.Uuid
+  supplier_id   String  @db.Uuid
+  part_name     String
+  part_number   String?
+  quantity      Int     @default(0)
+  unit_price    Decimal? @db.Decimal(10, 2)
+  reorder_level Int     @default(10)
+
+  supplier  Supplier    @relation(fields: [supplier_id], references: [supplier_id])
+  partsUsed PartsUsed[]
+
+  @@map("parts_inventory")
+}
+
+model PartsUsed {
+  parts_used_id String  @id @default(uuid()) @db.Uuid
+  order_id      String  @db.Uuid
+  part_id       String  @db.Uuid
+  quantity_used Int
+  unit_price    Decimal @db.Decimal(10, 2)
+
+  serviceOrder   ServiceOrder   @relation(fields: [order_id], references: [order_id], onDelete: Cascade)
+  partsInventory PartsInventory @relation(fields: [part_id], references: [part_id])
+
+  @@map("parts_used")
+}
+
+model Invoice {
+  invoice_id    String   @id @default(uuid()) @db.Uuid
+  order_id      String   @unique @db.Uuid
+  service_total Decimal  @default(0) @db.Decimal(10, 2)
+  parts_total   Decimal  @default(0) @db.Decimal(10, 2)
+  tax           Decimal  @default(0) @db.Decimal(10, 2)
+  grand_total   Decimal  @default(0) @db.Decimal(10, 2)
+  invoice_date  DateTime @default(now()) @db.Date
+
+  serviceOrder ServiceOrder @relation(fields: [order_id], references: [order_id], onDelete: Cascade)
+  payments     Payment[]
+
+  @@map("invoice")
+}
+
+model Payment {
+  payment_id   String   @id @default(uuid()) @db.Uuid
+  invoice_id   String   @db.Uuid
+  amount       Decimal  @db.Decimal(10, 2)
+  method       String
+  payment_date DateTime @default(now())
+  status       String   @default("Pending")
+
+  invoice Invoice @relation(fields: [invoice_id], references: [invoice_id], onDelete: Cascade)
+
+  @@map("payment")
+}
